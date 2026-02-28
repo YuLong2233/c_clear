@@ -128,8 +128,12 @@ class CleanerApp(ctk.CTk):
 
     def _check_update(self):
         try:
-            # 去除默认请求头限制，使用一个常见的User-Agent以防遭拒
-            req = urllib.request.Request(UPDATE_URL, headers={'User-Agent': 'Mozilla/5.0'})
+            # 加入时间戳实现"缓存穿透"，强制抛弃 GitHub CDN 的陈旧数据
+            busting_url = f"{UPDATE_URL}?t={int(time.time())}"
+            req = urllib.request.Request(busting_url, headers={
+                'User-Agent': 'Mozilla/5.0',
+                'Cache-Control': 'no-cache'
+            })
             with urllib.request.urlopen(req, timeout=5) as response:
                 data = json.loads(response.read().decode('utf-8'))
                 
