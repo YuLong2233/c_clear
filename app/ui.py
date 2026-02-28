@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import os
+import sys
 import threading
 import time
 import webbrowser
@@ -18,6 +20,16 @@ ctk.set_default_color_theme("blue")
 CURRENT_VERSION = "2.0.0"
 UPDATE_URL = "https://raw.githubusercontent.com/YuLong2233/c_clear/master/version.json"
 
+# 计算图标绝对路径：打包后用 _MEIPASS，开发态用项目根目录下的 assets/
+if hasattr(sys, "_MEIPASS"):
+    _ICON_PATH = os.path.join(sys._MEIPASS, "assets", "icon.ico")
+else:
+    # __file__ 是 app/ui.py，因此向上一层到项目根
+    _ICON_PATH = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "assets", "icon.ico"
+    )
+
 
 class UpdateDialog(ctk.CTkToplevel):
     def __init__(self, master, data, i18n):
@@ -32,11 +44,15 @@ class UpdateDialog(ctk.CTkToplevel):
         self.title("发现新版本 🚀")
         self.geometry("460x360")
         self.resizable(False, False)
+        self.configure(fg_color="#1e1e1e")  # 与主窗口深色主题保持一致，消除白边框
         
         # 确保在最上层
         self.attributes("-topmost", True)
         self.grab_set() # 模态窗口
         
+        # 延迟设置图标，对抗 Windows 窗口管理器的默认图标抢占
+        self.after(200, self._set_icon)
+            
         # 居中逻辑
         self.update_idletasks()
         x = master.winfo_x() + (master.winfo_width() // 2) - (self.winfo_width() // 2)
@@ -67,6 +83,14 @@ class UpdateDialog(ctk.CTkToplevel):
         self.btn_yes = ctk.CTkButton(self.btn_frame, text=btn_text_yes, width=140, command=self._on_update)
         self.btn_yes.pack(side="right")
 
+    def _set_icon(self):
+        """Safe delayed icon setter to prevent Windows WM from overriding with default."""
+        try:
+            if os.path.exists(_ICON_PATH):
+                self.iconbitmap(_ICON_PATH)
+        except Exception:
+            pass
+
     def _on_update(self):
         webbrowser.open(self.download_url)
         self.destroy()
@@ -85,9 +109,10 @@ class CleanerApp(ctk.CTk):
         self.minsize(640, 600)
         self.resizable(True, True)
         
-        # Try loading icon
+        # 加载图标（使用绝对路径）
         try:
-            self.iconbitmap(resource_path("assets/icon.ico"))
+            if os.path.exists(_ICON_PATH):
+                self.iconbitmap(_ICON_PATH)
         except:
             pass
             
@@ -137,6 +162,7 @@ class CleanerApp(ctk.CTk):
         self.btn_lang = ctk.CTkButton(
             self.top_frame, text="🌐 EN/中", width=70, height=28,
             fg_color="#333333", hover_color="#0088cc", text_color="white",
+            font=ctk.CTkFont(family="Segoe UI", size=13),
             command=self._toggle_lang
         )
         self.btn_lang.pack(side="right", padx=(5, 0))
@@ -145,6 +171,7 @@ class CleanerApp(ctk.CTk):
         self.btn_more = ctk.CTkButton(
             self.top_frame, text="", width=100, height=28,
             fg_color="#333333", hover_color="#0088cc", text_color="white",
+            font=ctk.CTkFont(family="Segoe UI", size=13),
             command=lambda: webbrowser.open("https://freeshare-3gp.pages.dev/")
         )
         self.btn_more.pack(side="right", padx=5)
@@ -153,6 +180,7 @@ class CleanerApp(ctk.CTk):
         self.btn_github = ctk.CTkButton(
             self.top_frame, text="", width=90, height=28,
             fg_color="#333333", hover_color="#0088cc", text_color="white",
+            font=ctk.CTkFont(family="Segoe UI", size=13),
             command=lambda: webbrowser.open("https://github.com/YuLong2233/c_clear.git")
         )
         self.btn_github.pack(side="right", padx=(0, 5))
