@@ -2,6 +2,9 @@
 import threading
 import time
 import webbrowser
+import json
+import urllib.request
+from tkinter import messagebox
 from typing import List
 import customtkinter as ctk
 
@@ -11,6 +14,62 @@ from cleaner import CLEAN_ITEMS, run_selected
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
+CURRENT_VERSION = "2.0.0"
+UPDATE_URL = "https://raw.githubusercontent.com/YuLong2233/c_clear/master/version.json"
+
+
+class UpdateDialog(ctk.CTkToplevel):
+    def __init__(self, master, data, i18n):
+        super().__init__(master)
+        self.data = data
+        self.i18n = i18n
+        
+        latest = data.get("version", "")
+        changelog = data.get("changelog", "有新功能发布！")
+        self.download_url = data.get("download_url", "https://freeshare-3gp.pages.dev/")
+        
+        self.title("发现新版本 🚀")
+        self.geometry("460x360")
+        self.resizable(False, False)
+        
+        # 确保在最上层
+        self.attributes("-topmost", True)
+        self.grab_set() # 模态窗口
+        
+        # 居中逻辑
+        self.update_idletasks()
+        x = master.winfo_x() + (master.winfo_width() // 2) - (self.winfo_width() // 2)
+        y = master.winfo_y() + (master.winfo_height() // 2) - (self.winfo_height() // 2)
+        self.geometry(f"+{max(0, x)}+{max(0, y)}")
+        
+        self.lbl_icon = ctk.CTkLabel(self, text="🚀", font=ctk.CTkFont(size=48))
+        self.lbl_icon.pack(pady=(20, 5))
+        
+        self.lbl_title = ctk.CTkLabel(self, text=f"发现新版本 v{latest}", font=ctk.CTkFont(size=18, weight="bold"))
+        self.lbl_title.pack(pady=5)
+        
+        # 使用多行文本框显示更新日志
+        self.txt_info = ctk.CTkTextbox(self, width=400, height=120, fg_color="#1e1e1e", font=ctk.CTkFont(size=13))
+        self.txt_info.pack(padx=30, pady=10)
+        self.txt_info.insert("0.0", f"更新内容：\n{changelog}")
+        self.txt_info.configure(state="disabled")
+        
+        self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.btn_frame.pack(fill="x", pady=(10, 20))
+        
+        btn_text_yes = "立即前往下载" if i18n.lang == "zh" else "Download Now"
+        btn_text_no = "稍后再说" if i18n.lang == "zh" else "Later"
+        
+        self.btn_no = ctk.CTkButton(self.btn_frame, text=btn_text_no, width=100, fg_color="#333333", hover_color="#444444", command=self.destroy)
+        self.btn_no.pack(side="right", padx=(10, 30))
+        
+        self.btn_yes = ctk.CTkButton(self.btn_frame, text=btn_text_yes, width=140, command=self._on_update)
+        self.btn_yes.pack(side="right")
+
+    def _on_update(self):
+        webbrowser.open(self.download_url)
+        self.destroy()
 
 
 class CleanerApp(ctk.CTk):
@@ -38,6 +97,29 @@ class CleanerApp(ctk.CTk):
         self._build_ui()
         self._update_disk_ui()
         self._update_texts()
+        
+        # 启动后台异步更新检测
+        threading.Thread(target=self._check_update, daemon=True).start()
+
+    def _check_update(self):
+        try:
+            # 去除默认请求头限制，使用一个常见的User-Agent以防遭拒
+            req = urllib.request.Request(UPDATE_URL, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                
+            latest_version = data.get("version", CURRENT_VERSION)
+            
+            # 简单的版本号字符串比对（例如："2.1.0" > "2.0.0"）
+            if latest_version > CURRENT_VERSION:
+                # 必须回调到主线程弹窗
+                self.after(1000, lambda: self._show_update_dialog(data))
+        except Exception:
+            pass # 没网、URL找不到等一切异常一律静默忽略
+            
+    def _show_update_dialog(self, data):
+        # 使用自定义的暗黑风格对话框替换系统弹窗
+        UpdateDialog(self, data, self.i18n)
 
     def _build_ui(self):
         # Top bar (Lang + Admin status)
@@ -71,7 +153,7 @@ class CleanerApp(ctk.CTk):
         self.btn_github = ctk.CTkButton(
             self.top_frame, text="", width=90, height=28,
             fg_color="#333333", hover_color="#0088cc", text_color="white",
-            command=lambda: webbrowser.open("https://github.com/your-username")
+            command=lambda: webbrowser.open("https://github.com/YuLong2233/c_clear.git")
         )
         self.btn_github.pack(side="right", padx=(0, 5))
 
